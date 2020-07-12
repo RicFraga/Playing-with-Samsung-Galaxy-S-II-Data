@@ -8,6 +8,8 @@
 # > From the data set in the past step, creates a second, independent tidy data
 # set with the average of each variable for each activity and each subject.
 
+library(tidyr)
+
 # This function merges data sets to create a single data set
 merge_data_sets <- function(training_path, test_path) {
      
@@ -103,8 +105,71 @@ name_variables <- function(data_set, fnames_path) {
      
      # Renaming the columns
      colnames(ds) <- features_names
-     
+
      return(ds)
 }
 
+# This function generates a data set with the following info:
+# Average of each variable for each activity for each subject
 
+#          -----------------------------------------------------------
+#          |    subject     |       activity    |      variable1     | ...
+#---------------------------------------------------------------------
+#          |        S1      |         A1        |        x11         | ...
+#---------------------------------------------------------------------
+#          |        S4      |         A2        |        x21         | ...
+#---------------------------------------------------------------------
+
+#   ...            ...                ...
+
+average_dataset <- function(data_set) {
+     # First we need to get the info from the test subjects
+     # Since we just joined the train and test data sets (in that order)
+     # we don't have to worry about the order
+     
+     # Reading the subjects info
+     train_subjects <- read.table('Data/UCI HAR Dataset/train/subject_train.txt')
+     test_subjects <- read.table('Data/UCI HAR Dataset/test/subject_test.txt')
+     
+     # Notice that dim(train_subjects)[1] + dim(test_subjects)[1] = 10299
+     total_subjects <- rbind(train_subjects, test_subjects)
+     data_set_wsubjects <- cbind(data_set, total_subjects)
+     
+     # Getting all the identifiers for the subjects
+     subjects <- unique(data_set_wsubjects[, dim(data_set_wsubjects)[2]])
+     activities <- unique(data_set_wsubjects[, dim(data_set_wsubjects)[2] - 1])
+     
+     # Matrix to save the values to then convert it into a data frame
+     averages_matrix <- matrix(ncol = 563)
+     
+     for(subject in subjects) {
+          
+          # We get the index in which the subject appears
+          index <- which(data_set_wsubjects[, 563] == subject)
+          subject_info <- data_set_wsubjects[index, 1:562]
+          
+          for(activity in activities) {
+               
+               # We get the index in which the activity appears
+               index <- which(subject_info[, 562] == activity)
+               activity_info <- data_set_wsubjects[index, 1:561]
+               
+               # We compute the mean of the activity and subject
+               mean <- colMeans(activity_info, na.rm = TRUE)
+               
+               # Constructing the row to append to the data set
+               row <- c(subject)
+               row <- c(row, activity)
+               row <- c(row, mean)
+               
+               averages_matrix <- rbind(averages_matrix, row)
+          }    
+     }
+     
+     # Renaming the dimensions of the matrix
+     colnames(averages_matrix) <- c('subject', 'activity', colnames(data_set[1:561]))
+     rownames(averages_matrix) <- c()
+     
+     # The first row is filled with garbage, so we don't return it
+     return(as.data.frame(averages_matrix[-1, ]))
+}
